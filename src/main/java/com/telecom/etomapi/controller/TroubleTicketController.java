@@ -25,33 +25,56 @@ public class TroubleTicketController {
     public Response findAll(@Context UriInfo uriInfo) {
         MultivaluedMap<String, String> queryParameters = uriInfo.getQueryParameters();
         Map<String, String> filters = new HashMap<>();
+        String fields = queryParameters.getFirst("fields");
+        
         queryParameters.forEach((k, v) -> {
-            if (!v.isEmpty()) filters.put(k, v.get(0));
+            if (!v.isEmpty() && !k.equals("fields")) filters.put(k, v.get(0));
         });
         
         List<TroubleTicket> list = service.findAll(filters);
-        return Response.ok(list).build();
+        List<Map<String, Object>> filteredList = list.stream()
+                .map(t -> service.filterTicket(t, fields))
+                .collect(Collectors.toList());
+        
+        return Response.ok(filteredList).build();
     }
 
     @GET
     @Path("/{id}")
-    public Response findById(@PathParam("id") String id) {
+    public Response findById(@PathParam("id") String id, @QueryParam("fields") String fields) {
         TroubleTicket ticket = service.findById(id);
-        return Response.ok(ticket).build();
+        return Response.ok(service.filterTicket(ticket, fields)).build();
     }
 
     @POST
     public Response create(TroubleTicket ticket) {
         String host = headers.getHeaderString("Host");
         TroubleTicket created = service.create(ticket, host);
-        return Response.status(Response.Status.CREATED).entity(created).build();
+        
+        // TMF621 Step 1: POST returns minimal fields
+        Map<String, Object> responseBody = new HashMap<>();
+        responseBody.put("id", created.getId());
+        responseBody.put("status", created.getStatus());
+        responseBody.put("creationDate", created.getCreationDate());
+        
+        return Response.status(Response.Status.CREATED).entity(responseBody).build();
     }
 
     @PATCH
     @Path("/{id}")
     public Response update(@PathParam("id") String id, Map<String, Object> updates) {
         TroubleTicket updated = service.update(id, updates);
-        return Response.ok(updated).build();
+        
+        // TMF621 Step 3 & 5: PATCH returns minimal fields (status, and update/resolution dates)
+        Map<String, Object> responseBody = new HashMap<>();
+        responseBody.put("status", updated.getStatus());
+        if (updated.getStatus().equalsIgnoreCase("Resolved")) {
+            responseBody.put("resolutionDate", updated.getResolutionDate());
+        } else {
+            responseBody.put("lastUpdate", updated.getLastUpdate());
+        }
+        
+        return Response.ok(responseBody).build();
     }
 
     @DELETE

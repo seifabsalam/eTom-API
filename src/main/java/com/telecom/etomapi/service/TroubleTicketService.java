@@ -180,4 +180,23 @@ public class TroubleTicketService {
             throw new ResourceNotFoundException("TroubleTicket with id '" + id + "' does not exist");
         }
     }
+
+    public Map<String, Object> filterTicket(TroubleTicket ticket, String fields) {
+        Map<String, Object> fullMap = OBJECT_MAPPER.convertValue(ticket, new TypeReference<Map<String, Object>>() {});
+        if (fields == null || fields.trim().isEmpty()) {
+            return fullMap;
+        }
+
+        Set<String> fieldSet = Arrays.stream(fields.split(","))
+                .map(String::trim)
+                .collect(Collectors.toSet());
+
+        Map<String, Object> filteredMap = new LinkedHashMap<>();
+        for (String field : fieldSet) {
+            if (fullMap.containsKey(field)) {
+                filteredMap.put(field, fullMap.get(field));
+            }
+        }
+        return filteredMap;
+    }
 }
